@@ -32,6 +32,13 @@ void Server::join(size_t client_index)
 
 	std::string channel_name = input[1];
 
+	// Check if channel name starts with '#'
+	if (channel_name[0] != '#')
+	{
+		clients[client_index].message(":server 476 " + clients[client_index].getNickname() + " " + channel_name + " :Invalid channel name\r\n");
+		return;
+	}
+
 	// Check if channel already exists
 	for (std::vector<Channel>::iterator it = channels.begin(); it != channels.end(); ++it)
 	{
@@ -46,10 +53,16 @@ void Server::join(size_t client_index)
 
 			// Add client to the channel
 			it->addClient(clients[client_index]);
-			clients[client_index].message(":" + clients[client_index].getNickname() + "!" + 
+			std::string join_message = ":" + clients[client_index].getNickname() + "!" + 
 										clients[client_index].getUsername() + "@" + 
 										clients[client_index].getIp_address() + 
-										" JOIN " + channel_name + "\r\n");
+										" JOIN " + channel_name + "\r\n";
+			std::vector<Client> channel_clients = it->getClients();
+			// Send JOIN message to all clients in the channel
+			for (std::vector<Client>::iterator client_it = channel_clients.begin(); client_it != channel_clients.end(); ++client_it)
+			{
+				client_it->message(join_message);
+			}
 			return;
 		}
 	}
@@ -57,6 +70,7 @@ void Server::join(size_t client_index)
 	// If channel does not exist, create it
 	Channel new_channel(channel_name, "");
 	new_channel.addClient(clients[client_index]);
+	new_channel.addOperator(clients[client_index]); // Make the creating user an operator
 	channels.push_back(new_channel);
 	clients[client_index].message(":" + clients[client_index].getNickname() + "!" + 
 								clients[client_index].getUsername() + "@" + 

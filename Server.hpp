@@ -49,10 +49,11 @@ public:
 
     void nick(size_t client_index);
     void user(size_t client_index);
-    void help(size_t client_index);
     void pass(size_t client_index);
     void privmsg(size_t client_index);
     void join(size_t client_index);
+    void topic(size_t client_index);
+    void help(size_t client_index);
 
     // test
     void printAllClients();

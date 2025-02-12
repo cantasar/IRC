@@ -11,7 +11,7 @@ class Channel{
         std::string _topic;
         std::vector<Client> _clients;
         std::vector<Client> _operators;
-    
+
     public:
         Channel(std::string name, std::string topic);
         Channel(Channel const &channel);
@@ -34,6 +34,11 @@ class Channel{
         std::vector<Client> getOperators();
 
         bool isClientInChannel(std::string nickname);
+
+
+
+        void printChannel();
+
 
 };
 

@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Channel.hpp"
 #include <sstream>
 
 Server::Server(int port, std::string password) : port(port), password(password)
@@ -127,7 +128,11 @@ void Server::loopProgram()
                 printAllClients();
 
                 logControl(client_index);
-
+                
+                for (size_t i = 0; i < channels.size(); ++i)
+                {
+                    channels[i].printChannel();
+                }
 
 
                 if (bytes_received < 0)
@@ -226,6 +231,7 @@ void Server::executeCommand(size_t c_index)
     commands.push_back("PASS");
     commands.push_back("PRIVMSG");
     commands.push_back("JOIN");
+    commands.push_back("TOPIC");
     commands.push_back("help");
 
     functions.push_back(&Server::nick);
@@ -233,6 +239,7 @@ void Server::executeCommand(size_t c_index)
     functions.push_back(&Server::pass);
     functions.push_back(&Server::privmsg);
     functions.push_back(&Server::join);
+    functions.push_back(&Server::topic);
     functions.push_back(&Server::help);
 
 

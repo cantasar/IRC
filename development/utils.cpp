@@ -1,4 +1,5 @@
 #include "../Server.hpp"
+#include "../Channel.hpp"
 
 void Server::printAllInputs()
 {
@@ -32,5 +33,22 @@ void Server::printServer()
 	std::cout << "Server Port: " << this->port << std::endl;
 	std::cout << "Server Password: " << this->password << std::endl;
 	std::cout << "Server Max fd: " << this->max_fd << std::endl;
+	std::cout << std::endl;
+}
+
+void Channel::printChannel()
+{
+	std::cout << "Channel Name: " << this->_name << std::endl;
+	std::cout << "Channel Topic: " << this->_topic << std::endl;
+	std::cout << "Channel Clients: " << std::endl;
+	for (std::vector<Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); it++)
+	{
+		std::cout << "-" << it->getNickname() << std::endl;
+	}
+	std::cout << "Channel Operators: " << std::endl;
+	for (std::vector<Client>::iterator it = this->_operators.begin(); it != this->_operators.end(); it++)
+	{
+		std::cout << "-" << it->getNickname() << std::endl;
+	}
 	std::cout << std::endl;
 }
