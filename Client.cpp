@@ -65,7 +65,7 @@ void Client::setUsername(std::string username)
     this->username = username;
 }
 
-std::string Client::getNickname()
+std::string Client::getNickname() const
 {
     return nickname;
 }

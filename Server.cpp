@@ -232,7 +232,10 @@ void Server::executeCommand(size_t c_index)
     commands.push_back("PRIVMSG");
     commands.push_back("JOIN");
     commands.push_back("TOPIC");
-    commands.push_back("help");
+    commands.push_back("KICK");
+    commands.push_back("MODE");
+    commands.push_back("INVITE");
+    commands.push_back("HELP");
 
     functions.push_back(&Server::nick);
     functions.push_back(&Server::user);
@@ -240,6 +243,9 @@ void Server::executeCommand(size_t c_index)
     functions.push_back(&Server::privmsg);
     functions.push_back(&Server::join);
     functions.push_back(&Server::topic);
+    functions.push_back(&Server::kick);
+    functions.push_back(&Server::mode);
+    functions.push_back(&Server::invite);
     functions.push_back(&Server::help);
 
 

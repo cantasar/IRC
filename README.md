@@ -30,6 +30,35 @@
   - userin channel a katilmis olmasi gerekli
   - userin operator olmasi gerekli
   - topic degistiginde tum channel uyelerine mesaj gider
+- KICK [#channel] [nickname] :[reason]
+  - eger komutu yazan kisi operator ise kisiyi kanaldan atar
+  - kanalin varligini kullanicinin bulunup bulunmadigini kontrol eder
+- MODE [#channel] [+/-][o/k/i/t/l] [parameter]
+  - Channel operatorleri tarafindan kullanilabilir
+  - +o [nickname] ile kullaniciya operator yetkisi verilir
+  - -o [nickname] ile kullanicinin operator yetkisi alinir
+  - 
+  - +k [key] ile channel a sifre konulur
+  - -k ile channel in sifresi kaldirilir
+  - 
+  - +i ile channel invite-only olur
+  - -i ile channel invite-only olmaktan cikar
+  - 
+  - +t ile sadece operatorler topic degistirebilir
+  - -t ile tum kullanicilar topic degistirebilir
+  - 
+  - +l [limit] ile channel a kullanici limiti konulur
+  - -l ile channel in kullanici limiti kaldirilir
+  - 
+  - kullanicinin channel da olmasi ve operator olmasi gerekir
+  - tum channel uyelerine mode degisikligi mesaji gider
+- INVITE [nickname] [#channel]
+  - Channel operatorleri tarafindan kullanilabilir
+  - Invite edilen kullanicinin server da olmasi gerekir
+  - Invite eden kisinin channel da olmasi ve operator olmasi gerekir
+  - Invite edilen kullanici channel da degilse invite edilir
+  - Invite edilen kullanici channel a katilabilir
+  - Invite edilen kullanici channel a katilmak icin JOIN komutunu kullanmalidir
 
 
 - HELP veya help

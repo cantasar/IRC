@@ -53,6 +53,11 @@ public:
     void privmsg(size_t client_index);
     void join(size_t client_index);
     void topic(size_t client_index);
+    void kick(size_t client_index);
+    void mode(size_t client_index);
+    void invite(size_t client_index);
+
+
     void help(size_t client_index);
 
     // test

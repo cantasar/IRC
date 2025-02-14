@@ -40,6 +40,8 @@ void Channel::printChannel()
 {
 	std::cout << "Channel Name: " << this->_name << std::endl;
 	std::cout << "Channel Topic: " << this->_topic << std::endl;
+	std::cout << "Channel Key: " << this->_key << "~"<< std::endl;
+	std::cout << "Channel Has Key: " << (this->getChannelKey()) << std::endl;
 	std::cout << "Channel Clients: " << std::endl;
 	for (std::vector<Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); it++)
 	{
