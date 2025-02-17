@@ -246,3 +246,287 @@ int valread = recv(connected_clients[i], buffer, sizeof(buffer), 0);
   - **len**: The maximum number of bytes to read.
   - **flags**: Usually set to `0` for normal data reception.
 
+<hr>
+
+## IRC Server Implementation Details
+
+### 1. Server Başlatma Süreci
+1. Server constructor'ı çağrılır (port ve password parametreleri ile)
+2. `startServer()` fonksiyonu çalıştırılır
+3. Socket oluşturulur ve yapılandırılır
+4. Server ana döngüsü başlatılır (`loopProgram()`)
+
+### 2. Socket Oluşturma ve Yapılandırma
+1. **Socket Oluşturma**
+   - `socket(AF_INET, SOCK_STREAM, 0)` çağrısı yapılır
+   - AF_INET: IPv4 protokolünü kullanacağımızı belirtir
+   - SOCK_STREAM: TCP bağlantı tipini belirtir
+   - 0: Protocol number. When set to `0`, the default protocol (TCP for `SOCK_STREAM`) is automatically chosen.
+
+2. **Socket Yapılandırma**
+   - `setsockopt()` ile SO_REUSEADDR ayarlanır
+   - Bu ayar, sunucu yeniden başlatıldığında aynı portu hemen kullanabilmeyi sağlar
+   - `bind()` ile socket belirli bir port ve IP adresine bağlanır
+   - `listen()` ile bağlantı dinlemeye başlanır
+
+### 3. fd_set ve Select Mekanizması
+1. **fd_set Kullanım Amacı**
+   - Birden fazla socket'i aynı anda dinleyebilmek için kullanılır
+   - Bloklamayan I/O işlemleri yapabilmeyi sağlar
+   - Hem server socket'ini hem de client socket'lerini aynı anda yönetebilmeyi sağlar
+
+2. **Select Mekanizması**
+   - `select()` fonksiyonu ile hangi socket'lerde aktivite olduğu kontrol edilir
+   - Yeni bağlantı istekleri ve mevcut bağlantılardan gelen veriler tespit edilir
+   - Timeout mekanizması ile sürekli CPU kullanımı engellenir
+
+### 4. Client Bağlantı Süreci
+1. **Bağlantı Kabul Etme**
+   - Client bağlantı isteği gönderir
+   - Server `accept()` ile bağlantıyı kabul eder
+   - Yeni bir socket oluşturulur (client ile iletişim için)
+   - Client bilgileri (IP, port) alınır
+
+2. **Client Doğrulama**
+   - Client PASS komutu ile şifre gönderir
+   - USER komutu ile kullanıcı bilgilerini gönderir
+   - NICK komutu ile nickname belirlenir
+   - Tüm bu bilgiler doğrulandığında client "registered" durumuna geçer
+
+### 5. Client-Server İletişimi
+1. **Veri Alışverişi**
+   - `recv()` fonksiyonu ile client'tan veri alınır
+   - Alınan veri buffer'a yazılır
+   - Buffer'daki veri parse edilir ve komutlara ayrılır
+   - Komutlar işlenir ve gerekli cevaplar `send()` ile gönderilir
+
+2. **Komut İşleme**
+   - Her komut için özel handler fonksiyonları bulunur (PRIVMSG, JOIN, etc.)
+   - Komutlar sırayla işlenir
+   - Gerekli kontroller yapılır (yetki, parametre sayısı, etc.)
+   - Sonuç client'a bildirilir
+
+### 6. Netcat (nc) Kullanımı
+1. **Netcat Nedir?**
+   - TCP/IP bağlantıları için kullanılan bir ağ aracıdır
+   - "İsviçre çakısı" olarak bilinir
+   - Basit TCP/IP bağlantıları kurmak ve test etmek için kullanılır
+
+2. **IRC ile Kullanımı**
+   - `nc hostname port` komutu ile sunucuya bağlanılır
+   - Raw TCP bağlantısı sağlar
+   - IRC komutları doğrudan gönderilebilir
+   - Test ve debug için idealdir
+
+### 7. Veri Akışı
+1. **Client -> Server**
+   - Client mesaj gönderir
+   - Veri TCP soketi üzerinden iletilir
+   - Server veriyi buffer'a alır
+   - Buffer parse edilir
+   - Komut işlenir
+
+2. **Server -> Client**
+   - Server cevap hazırlar
+   - Cevap formatlanır (IRC protokolüne uygun şekilde)
+   - TCP soketi üzerinden client'a gönderilir
+   - Client cevabı alır ve işler
+
+### 8. Kanal Yönetimi
+1. **Kanal Oluşturma**
+   - İlk JOIN komutu ile kanal oluşturulur
+   - İlk kullanıcı operator olur
+   - Kanal ayarları belirlenir (mode)
+
+2. **Kanal İşlemleri**
+   - Kullanıcı ekleme/çıkarma
+   - Mode değişiklikleri
+   - Topic yönetimi
+   - Mesaj iletimi
+   - Operator yönetimi
+
+### 9. Güvenlik Mekanizmaları
+1. **Bağlantı Güvenliği**
+   - Password kontrolü
+   - Kullanıcı doğrulama
+   - Operator yetkilendirme
+
+2. **Kanal Güvenliği**
+   - Mode kontrolleri (+i, +k, etc.)
+   - Operator yetki kontrolleri
+   - Invite-only kontrolleri
+   - Ban mekanizması
+
+Bu dokümantasyon, IRC sunucusunun temel çalışma prensiplerini ve teknik detaylarını açıklamaktadır. Her bir bileşen ve mekanizma, sunucunun güvenli ve verimli çalışması için önemli rol oynamaktadır.
+
+<hr>
+<hr>
+<hr>
+<hr>
+
+## Detailed Technical Implementation of IRC Server
+
+### 1. Server Initialization Process
+1. **Constructor Call**
+   - Port ve password parametreleri alınır
+   - `startServer()` fonksiyonu çağrılır
+   - İlk socket (master socket) oluşturulur
+   - `max_fd` değişkeni master socket ile başlatılır
+
+2. **Socket Creation & Configuration**
+   - `socket(AF_INET, SOCK_STREAM, 0)` ile master socket oluşturulur
+     - AF_INET: IPv4 protokolü
+     - SOCK_STREAM: TCP bağlantı tipi (güvenilir, sıralı, çift yönlü)
+     - 0: Sistem varsayılan protokolü
+   - Socket file descriptor (fd) döndürülür
+   - Negatif değer dönerse hata oluşmuştur
+
+3. **Socket Options Configuration**
+   - `setsockopt()` ile SO_REUSEADDR ayarlanır
+     ```cpp
+     int opt = 1;
+     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+     ```
+   - Bu ayar, sunucu kapanıp tekrar açıldığında "Address already in use" hatasını engeller
+   - TIME_WAIT durumundaki portların tekrar kullanılabilmesini sağlar
+
+4. **Server Address Structure**
+   ```cpp
+   struct sockaddr_in server_addr;
+   server_addr.sin_family = AF_INET;
+   server_addr.sin_port = htons(port);
+   server_addr.sin_addr.s_addr = INADDR_ANY;
+   ```
+   - sin_family: IPv4 protokolü
+   - sin_port: Port numarası (network byte order'a çevrilir)
+   - sin_addr: Tüm network interface'lerden bağlantı kabul edilir
+
+5. **Binding & Listening**
+   - `bind()`: Socket'i belirtilen adres ve porta bağlar
+   - `listen()`: Socket'i pasif dinleme moduna alır
+     - Bağlantı kuyruğu boyutu belirlenir (backlog)
+     - Gelen bağlantılar bu kuyrukta bekletilir
+
+### 2. File Descriptor Sets (fd_set)
+1. **fd_set Yapısı**
+   - Bit array olarak implemente edilmiştir
+   - Her bit bir file descriptor'ı temsil eder
+   - Maximum FD_SETSIZE kadar (genelde 1024) fd tutabilir
+
+2. **fd_set Operations**
+   ```cpp
+   FD_ZERO(&read_fds);     // Tüm bitleri sıfırlar
+   FD_SET(sockfd, &read_fds);   // Belirtilen fd'yi set eder
+   FD_CLR(fd, &read_fds);   // fd'yi set'ten çıkarır
+   FD_ISSET(fd, &read_fds); // fd'nin set'te olup olmadığını kontrol eder
+   ```
+
+### 3. Main Event Loop (Event-Driven Architecture)
+1. **Loop Initialization**
+   ```cpp
+   while (1) {
+       fd_set active_fds = read_fds;  // Her döngüde read_fds kopyalanır
+   }
+   ```
+   - read_fds: Master fd set (tüm aktif bağlantıları tutar)
+   - active_fds: select() için kullanılan geçici kopya
+
+2. **Select System Call**
+   ```cpp
+   select(max_fd + 1, &active_fds, NULL, NULL, NULL);
+   ```
+   - Parametreler:
+     1. max_fd + 1: Kontrol edilecek maximum fd değeri
+     2. &active_fds: Okuma için kontrol edilecek fd'ler
+     3. NULL: Yazma için kontrol edilecek fd'ler (kullanılmıyor)
+     4. NULL: Exception için kontrol edilecek fd'ler (kullanılmıyor)
+     5. NULL: Timeout değeri (NULL = sonsuz bekleme)
+   - Bloklu çalışır: Herhangi bir fd'de aktivite olana kadar bekler
+   - Döndüğünde active_fds'de sadece aktif fd'ler kalır
+
+### 4. Client Connection Process
+1. **New Connection Detection**
+   ```cpp
+   if (FD_ISSET(sockfd, &active_fds)) {
+       // Yeni bağlantı isteği var
+   }
+   ```
+   - Master socket'te aktivite = Yeni bağlantı isteği
+
+2. **Connection Acceptance**
+   ```cpp
+   int client_sockfd = accept(sockfd, NULL, NULL);
+   ```
+   - Yeni bir socket oluşturulur (client_sockfd)
+   - Bu socket sadece bu client ile iletişim için kullanılır
+   - Master socket dinlemeye devam eder
+
+3. **Client Socket Management**
+   - Yeni socket fd_set'e eklenir:
+     ```cpp
+     FD_SET(client_sockfd, &read_fds);
+     ```
+   - max_fd güncellenir (gerekirse):
+     ```cpp
+     if (client_sockfd > max_fd)
+         max_fd = client_sockfd;
+     ```
+   - Client listesine eklenir:
+     ```cpp
+     Client new_client(client_sockfd);
+     clients.push_back(new_client);
+     ```
+
+### 5. Data Reception & Processing
+1. **Data Check**
+   ```cpp
+   if (FD_ISSET(client_fd, &active_fds)) {
+       // Client'tan veri gelmiş
+   }
+   ```
+
+2. **Data Reception**
+   ```cpp
+   std::vector<char> buffer(1024);
+   int bytes_received = recv(client_fd, buffer.data(), buffer.size(), 0);
+   ```
+   - buffer: Gelen veriyi tutacak alan
+   - bytes_received:
+     - > 0: Alınan byte sayısı
+     - = 0: Bağlantı kapanmış
+     - < 0: Hata oluşmuş
+
+3. **Connection Status Check**
+   ```cpp
+   if (bytes_received <= 0) {
+       close(client_fd);
+       FD_CLR(client_fd, &read_fds);
+       // Client listesinden çıkar
+   }
+   ```
+
+### 6. Buffer Management
+1. **Buffer Structure**
+   - Fixed-size vector kullanılır (1024 bytes)
+   - Her recv() çağrısında sıfırlanır
+   - Null-terminated string olarak işlenir
+
+2. **Data Parsing**
+   - Buffer string'e çevrilir
+   - Kontrol karakterleri temizlenir (\r\n)
+   - Komut ve parametreler ayrıştırılır
+
+### 7. Error Handling
+1. **System Call Errors**
+   - Her system call sonrası hata kontrolü
+   - errno değeri kontrol edilir
+   - Uygun hata mesajı loglanır
+
+2. **Resource Management**
+   - Kapatılan bağlantıların temizlenmesi
+   - Buffer'ların temizlenmesi
+   - fd'lerin kapatılması
+
+Bu teknik dokümantasyon, IRC sunucusunun low-level çalışma mekanizmalarını detaylı olarak açıklamaktadır. Network programlama ve sistem programlama konseptlerinin pratik bir uygulaması olarak sunulmuştur.
+
+

@@ -42,6 +42,10 @@ void Channel::printChannel()
 	std::cout << "Channel Topic: " << this->_topic << std::endl;
 	std::cout << "Channel Key: " << this->_key << "~"<< std::endl;
 	std::cout << "Channel Has Key: " << (this->getChannelKey()) << std::endl;
+	std::cout << "Channel Limit: " << this->_limit << std::endl;
+	std::cout << "Channel Has Limit: " << (this->getChannelLimit()) << std::endl;
+	std::cout << "Channel Invite Only: " << (this->getInviteOnly()) << std::endl;
+	std::cout << "Channel Topic Protection: " << (this->getTopicProtection()) << std::endl;
 	std::cout << "Channel Clients: " << std::endl;
 	for (std::vector<Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); it++)
 	{
@@ -49,6 +53,11 @@ void Channel::printChannel()
 	}
 	std::cout << "Channel Operators: " << std::endl;
 	for (std::vector<Client>::iterator it = this->_operators.begin(); it != this->_operators.end(); it++)
+	{
+		std::cout << "-" << it->getNickname() << std::endl;
+	}
+	std::cout << "Channel Invited Clients: " << std::endl;
+	for (std::vector<Client>::iterator it = this->_invitedClients.begin(); it != this->_invitedClients.end(); it++)
 	{
 		std::cout << "-" << it->getNickname() << std::endl;
 	}
