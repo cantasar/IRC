@@ -33,3 +33,6 @@ Thumbs.db
 # Other
 *.swp
 *.lock
+
+# Ignore .gitignore files
+.gitignore
