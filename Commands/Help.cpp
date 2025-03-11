@@ -1,7 +1,8 @@
 #include "../Server.hpp"
 
-void Server::help(size_t client_index)
+void Server::help(size_t client_index, const std::string& command)
 {
+	(void)command;
 	this->clients[client_index].message(":ircserv 704 " + this->clients[client_index].getNickname() + " :-----HELP MENU-----\r\n");
 	
 	if (this->clients[client_index].getConnected())

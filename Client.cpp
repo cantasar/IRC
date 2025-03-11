@@ -34,9 +34,10 @@ Client &Client::operator=(Client const &client)
     return *this;
 }
 
-Client::~Client() {}
+Client::~Client() {
+}
 
-int Client::getC_sockfd()
+int Client::getC_sockfd() const
 {
     return c_sockfd;
 }
@@ -45,7 +46,7 @@ void Client::setC_sockfd(int c_sockfd)
     this->c_sockfd = c_sockfd;
 }
 
-bool Client::getConnected()
+bool Client::getConnected() const
 {
     return connected;
 }
@@ -55,7 +56,7 @@ void Client::setConnected(bool connected)
     this->connected = connected;
 }
 
-std::string Client::getUsername()
+std::string Client::getUsername() const
 {
     return username;
 }
@@ -75,7 +76,7 @@ void Client::setNickname(std::string nickname)
     this->nickname = nickname;
 }
 
-std::string Client::getPassword()
+std::string Client::getPassword() const
 {
     return password;
 }
@@ -85,17 +86,30 @@ void Client::setPassword(std::string password)
     this->password = password;
 }
 
-std::string Client::getIp_address()
+std::string Client::getIp_address() const
 {
     return ip_address;
 }
 
-void Client::setIp_address(int ip_address)
+void Client::setIp_address(const std::string &ip_address)
 {
     this->ip_address = ip_address;
 }
 
-void Client::message(std::string message)
+void Client::message(const std::string &message) const
 {
     send(c_sockfd, message.c_str(), message.size(), 0);
+}
+
+std::string &Client::getCommandBuffer()
+{
+    return command_buffer;
+}
+void Client::appendToCommandBuffer(const std::string &data)
+{
+    command_buffer += data;
+}
+void Client::clearCommandBuffer()
+{
+    command_buffer.clear();
 }

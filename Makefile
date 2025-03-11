@@ -1,26 +1,37 @@
 NAME = ircserv
 
-SRCS = 	main.cpp Server.cpp Client.cpp Channel.cpp Commands/Help.cpp Commands/Nick.cpp Commands/User.cpp Commands/Pass.cpp Commands/Privmsg.cpp Commands/Join.cpp Commands/Topic.cpp Commands/Kick.cpp Commands/Mode.cpp Commands/Invite.cpp development/utils.cpp
+SRCS = 	main.cpp \
+	Server.cpp \
+	ServerConnection.cpp \
+	ServerCommand.cpp \
+	Client.cpp \
+	Channel.cpp \
+	Commands/Nick.cpp \
+	Commands/User.cpp \
+	Commands/Help.cpp \
+	Commands/Pass.cpp \
+	Commands/Privmsg.cpp \
+	Commands/Join.cpp \
+	Commands/Topic.cpp \
+	Commands/Kick.cpp \
+	Commands/Mode.cpp \
+	Commands/Invite.cpp \
+	development/utils.cpp
 
 OBJS = $(SRCS:.cpp=.o)
-CXX_STANDARD = c++98
-CXX = c++
-CXXFLAGS = -g -Wall -Wextra -Werror
+FLAGS = -Wall -Wextra -Werror -std=c++98
 
 all: $(NAME)
 
 $(NAME): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJS)
-
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	c++ $(FLAGS) -o $(NAME) $(OBJS)
 
 clean:
-	rm -f $(OBJS) 
+	rm -f $(OBJS)
 
 fclean: clean
-	rm -rf $(NAME) .vscode
+	rm -f $(NAME)
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re 

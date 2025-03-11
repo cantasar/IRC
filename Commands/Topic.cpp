@@ -1,7 +1,9 @@
 #include "../Server.hpp"
 
-void Server::topic(size_t client_index)
+void Server::topic(size_t client_index, const std::string& command)
 {
+    std::vector<std::string> input = parseCommand(command);
+
     // Check if client is connected
     if (!clients[client_index].getConnected())
     {
@@ -10,7 +12,7 @@ void Server::topic(size_t client_index)
     }
 
     // Check if we have enough parameters (TOPIC <channel> <topic>)
-    if (input.size() < 3)
+    if (input.size() < 2)
     {
         clients[client_index].message(":server 461 " + clients[client_index].getNickname() + " TOPIC :Not enough parameters\r\n");
         clients[client_index].message(":server 461 " + clients[client_index].getNickname() + " TOPIC :Useage TOPIC <channel> <topic>\r\n");
@@ -18,7 +20,7 @@ void Server::topic(size_t client_index)
     }
 
     std::string channel_name = input[1];
-    std::string topic = input[2];
+    std::string topic = command.substr(command.find(channel_name) + channel_name.length() + 1);
 
     // Check if channel name starts with '#'
     if (channel_name[0] != '#')

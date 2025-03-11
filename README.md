@@ -1,248 +1,301 @@
-## To-Do List
+# IRC Server Projesi
 
-#### her kullanici ilk baglandiginda USER ve PASS komutu kullanarak login olmali
+Bu proje, Internet Relay Chat (IRC) protokolünü temel alan bir sunucu uygulamasıdır. Modern C++ kullanılarak geliştirilmiş olup, POSIX soket programlama API'lerini kullanmaktadır.
 
-- USER [nickname] [mode] [unused] :[username]
-  - nickname uniq olmaki buyuzden daha once alinmadigini kontrol eder
-  - mode ve unused degerlerini kullnmadik
-  - username iki noktadan sonra ise birden fazla kelime olabilir
-- PASS [password]
-  - server baslatilirken belirlenen sifre ile giris yapar
-  - kullanci daha once giris yapmis mi kontrol eder
+## İçindekiler
 
-#### Eger kullanici login olabilmisse bu komutlari kullanbilir
+1. [Proje Yapısı](#proje-yapısı)
+2. [Kurulum](#kurulum)
+3. [Kullanım](#kullanım)
+4. [Teknik Detaylar](#teknik-detaylar)
+5. [Soket Programlama](#soket-programlama)
+6. [IRC Komutları](#irc-komutları)
 
-- JOIN [#channel]
-  - eger channel yoksa olusturuyor
-  - channel varsa ve client daha once eklenmediyse ekliyor
-- PRIVMSG [#channel] [mesaj]
-  - eger kullanici channelda ekli degilse mesaj gondermez
-- PRIVMSG [nickname] [mesaj]
-  - nickname ile eslesen kullanici yoksa hata mesaji doner
-- PRIVMSG [#channel] :[birden fazla bosluklu mesaj]
-  - iki nokta eklenirse bosluklu mesajlar gonderilir
-- NICK [nickname]
-  - clientin nicknameini degistirebilmesi saglar
-  - login olmadan kullanilabir
-  - nicknamein daha once alinip alinmadigini kontrol eder
-- TOPIC [#channel] [topic]
-  - Channel in topic mesajini set eder
-  - userin channel a katilmis olmasi gerekli
-  - userin operator olmasi gerekli
-  - topic degistiginde tum channel uyelerine mesaj gider
-- KICK [#channel] [nickname] :[reason]
-  - eger komutu yazan kisi operator ise kisiyi kanaldan atar
-  - kanalin varligini kullanicinin bulunup bulunmadigini kontrol eder
-- MODE [#channel] [+/-][o/k/i/t/l] [parameter]
-  - Channel operatorleri tarafindan kullanilabilir
-  - +o [nickname] ile kullaniciya operator yetkisi verilir
-  - -o [nickname] ile kullanicinin operator yetkisi alinir
-  - 
-  - +k [key] ile channel a sifre konulur
-  - -k ile channel in sifresi kaldirilir
-  - 
-  - +i ile channel invite-only olur
-  - -i ile channel invite-only olmaktan cikar
-  - 
-  - +t ile sadece operatorler topic degistirebilir
-  - -t ile tum kullanicilar topic degistirebilir
-  - 
-  - +l [limit] ile channel a kullanici limiti konulur
-  - -l ile channel in kullanici limiti kaldirilir
-  - 
-  - kullanicinin channel da olmasi ve operator olmasi gerekir
-  - tum channel uyelerine mode degisikligi mesaji gider
-- INVITE [nickname] [#channel]
-  - Channel operatorleri tarafindan kullanilabilir
-  - Invite edilen kullanicinin server da olmasi gerekir
-  - Invite eden kisinin channel da olmasi ve operator olmasi gerekir
-  - Invite edilen kullanici channel da degilse invite edilir
-  - Invite edilen kullanici channel a katilabilir
-  - Invite edilen kullanici channel a katilmak icin JOIN komutunu kullanmalidir
+## Proje Yapısı
 
+Proje, modüler bir yapıda tasarlanmış olup aşağıdaki ana bileşenlerden oluşmaktadır:
 
-- HELP veya help
-  - client a serverda rehber olacak komutlarin nasil kullanildigini vs. aciklayacak
-  - kvirc kucuk harfle gonderiyor servera 
+```
+.
+├── Server.cpp            # Ana sunucu sınıfı implementasyonu
+├── ServerConnection.cpp  # Bağlantı yönetimi işlemleri
+├── ServerCommand.cpp     # Komut işleme mekanizmaları
+├── Client.cpp           # İstemci yönetimi
+├── Channel.cpp          # Kanal yönetimi
+└── Commands/            # IRC komutları implementasyonları
+```
 
----
-<br>
+## Kurulum
 
-# IRC  - Server Setup and Connection
-![img](https://github.com/user-attachments/assets/e9b69897-c5b7-44c7-a986-1480c4925ffd)
+Projeyi derlemek için aşağıdaki komutları kullanın:
 
-This project develops an IRC application using C++. The following sections provide detailed information on setting up the server, making connections, and using sockets.
+```bash
+make        # Projeyi derler
+make clean  # Obje dosyalarını temizler
+make fclean # Tüm derlenmiş dosyaları temizler
+make re     # Temiz bir şekilde yeniden derler
+```
 
-## Server Address Configuration
+## Kullanım
 
-To run the server, the necessary configuration is made using the `sockaddr_in` structure, which represents IPv4 addresses and contains the address information required for creating a socket or listening socket.
+Sunucuyu başlatmak için:
 
-### sockaddr_in Structure
+```bash
+./ircserv <port> <password>
+```
+
+- `port`: Sunucunun dinleyeceği port numarası (1024-65535 arası)
+- `password`: Sunucu şifresi
+
+## Teknik Detaylar
+
+### Soket Programlama
+
+Bu bölümde, projede kullanılan temel soket programlama fonksiyonları ve yapıları detaylı olarak açıklanmaktadır.
+
+#### 1. socket()
 
 ```cpp
+int socket(int domain, int type, int protocol);
+```
+
+- **Açıklama**: Yeni bir soket oluşturur
+- **Parametreler**:
+  - `domain`: Haberleşme domain'i (AF_INET: IPv4)
+  - `type`: Soket tipi (SOCK_STREAM: TCP)
+  - `protocol`: Protokol tipi (0: varsayılan)
+- **Dönüş Değeri**: Başarılı olursa soket dosya tanımlayıcısı, hata durumunda -1
+- **Kullanım Örneği**:
+```cpp
+sockfd = socket(AF_INET, SOCK_STREAM, 0);
+```
+
+#### 2. setsockopt()
+
+```cpp
+int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+```
+
+- **Açıklama**: Soket seçeneklerini ayarlar
+- **Parametreler**:
+  - `sockfd`: Soket dosya tanımlayıcısı
+  - `level`: Protokol seviyesi (SOL_SOCKET)
+  - `optname`: Seçenek adı (SO_REUSEADDR)
+  - `optval`: Seçenek değeri
+  - `optlen`: optval'in boyutu
+- **Önemli**: SO_REUSEADDR seçeneği, sunucunun yeniden başlatılması durumunda "Address already in use" hatasını önler
+
+#### 3. bind()
+
+```cpp
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+```
+
+- **Açıklama**: Soketi belirli bir adres ve porta bağlar
+- **Parametreler**:
+  - `sockfd`: Soket dosya tanımlayıcısı
+  - `addr`: Bağlanılacak adres yapısı
+  - `addrlen`: Adres yapısının boyutu
+- **Adres Yapısı**:
+```cpp
 struct sockaddr_in {
-    short            sin_family;   // Address family (AF_INET/AF_INET6)
-    unsigned short   sin_port;     // Port number (converted using htons())
-    struct in_addr   sin_addr;     // IP address (e.g., INADDR_ANY)
-    char             sin_zero[8];  // Padding for alignment
+    sa_family_t sin_family;     // AF_INET
+    in_port_t sin_port;         // Port numarası (network byte order)
+    struct in_addr sin_addr;    // IPv4 adresi
 };
 ```
 
-### Structure Members:
-
-- **sin_family**: Specifies the address family (use `AF_INET` for IPv4).
-- **sin_port**: Sets the port number to listen on. The port number is converted to network byte order using `htons()`.
-- **sin_addr**: Represents the IP address. If set to `INADDR_ANY`, it listens on all available IP addresses.
-- **sin_zero**: Padding added to align the structure to the appropriate size.
-
-### Creating a Socket
-
-The `socket()` function is used to create a socket in your server application:
+#### 4. listen()
 
 ```cpp
-int sock = socket(AF_INET, SOCK_STREAM, 0);
-if (sock < 0) {
-    std::cerr << "Socket creation failed" << std::endl;
-    return -1;
+int listen(int sockfd, int backlog);
+```
+
+- **Açıklama**: Soketi pasif dinleme moduna alır
+- **Parametreler**:
+  - `sockfd`: Soket dosya tanımlayıcısı
+  - `backlog`: Bekleyen bağlantı kuyruğunun maksimum uzunluğu
+- **Not**: Backlog değeri sistem tarafından sınırlandırılabilir (Linux'ta genellikle 128)
+
+#### 5. accept()
+
+```cpp
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+```
+
+- **Açıklama**: Gelen bağlantı isteğini kabul eder
+- **Parametreler**:
+  - `sockfd`: Dinleyen soket
+  - `addr`: İstemci adres bilgisi (NULL olabilir)
+  - `addrlen`: addr yapısının boyutu
+- **Dönüş**: Yeni bağlantı için soket tanımlayıcısı
+
+#### 6. recv()
+
+```cpp
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+```
+
+- **Açıklama**: Soketten veri okur
+- **Parametreler**:
+  - `sockfd`: Soket tanımlayıcısı
+  - `buf`: Veri tamponu
+  - `len`: Tampon boyutu
+  - `flags`: Alım seçenekleri (genellikle 0)
+- **Dönüş**: Okunan byte sayısı, 0 bağlantı kapandığında, -1 hata durumunda
+
+#### 7. select()
+
+```cpp
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+```
+
+- **Açıklama**: I/O multiplexing için kullanılır, birden fazla soketi eşzamanlı olarak izler
+- **Parametreler**:
+  - `nfds`: İzlenecek en yüksek dosya tanımlayıcısı + 1
+  - `readfds`: Okuma için izlenecek soketler kümesi
+  - `writefds`: Yazma için izlenecek soketler kümesi
+  - `exceptfds`: İstisnai durumlar için izlenecek soketler
+  - `timeout`: Zaman aşımı değeri
+
+#### 8. fd_set ve İlgili Makrolar
+
+```cpp
+typedef struct {
+    unsigned long fds_bits[FD_SETSIZE/NFDBITS];
+} fd_set;
+```
+
+- **Açıklama**: fd_set, dosya tanımlayıcılarını bir bit maskesi olarak tutan bir veri yapısıdır
+- **Önemli Makrolar**:
+
+1. **FD_ZERO**
+```cpp
+void FD_ZERO(fd_set *set);
+```
+- fd_set yapısını sıfırlar
+- Kullanım örneği:
+```cpp
+fd_set read_fds;
+FD_ZERO(&read_fds);  // read_fds kümesini temizler
+```
+
+2. **FD_SET**
+```cpp
+void FD_SET(int fd, fd_set *set);
+```
+- Belirtilen dosya tanımlayıcısını kümeye ekler
+- Kullanım örneği:
+```cpp
+FD_SET(sockfd, &read_fds);  // sockfd'yi izlenecek soketler kümesine ekler
+```
+
+3. **FD_CLR**
+```cpp
+void FD_CLR(int fd, fd_set *set);
+```
+- Belirtilen dosya tanımlayıcısını kümeden çıkarır
+- Kullanım örneği:
+```cpp
+FD_CLR(client_fd, &read_fds);  // client_fd'yi kümeden çıkarır
+```
+
+4. **FD_ISSET**
+```cpp
+int FD_ISSET(int fd, fd_set *set);
+```
+- Belirtilen dosya tanımlayıcısının kümede olup olmadığını kontrol eder
+- Dönüş değeri: Dosya tanımlayıcısı kümede varsa true (0'dan farklı), yoksa false (0)
+- Kullanım örneği:
+```cpp
+if (FD_ISSET(client_fd, &read_fds)) {
+    // client_fd üzerinde okuma için hazır veri var
 }
 ```
 
-#### `socket()` Function:
-
-- **AF_INET**: Specifies the IPv4 address family.
-- **SOCK_STREAM**: Indicates the TCP protocol, providing reliable, connection-oriented data transmission.
-- **0**: Protocol number. When set to `0`, the default protocol (TCP for `SOCK_STREAM`) is automatically chosen.
-
-If the socket creation fails, the `socket()` function will return `-1`.
-
-### Configuring the Server Address
-
-To configure the server's IP address and port, use the following code:
+#### fd_set Kullanım Örneği
 
 ```cpp
-struct sockaddr_in serv_addr;
-serv_addr.sin_family = AF_INET;                          // IPv4 protocol
-serv_addr.sin_port = htons(8080);                         // Convert the port number to network byte order
-serv_addr.sin_addr.s_addr = inet_addr("192.168.1.1");     // Specified IP address
-```
+fd_set read_fds;
+FD_ZERO(&read_fds);                // Kümeyi temizle
+FD_SET(server_fd, &read_fds);      // Ana sunucu soketini ekle
 
-### Why Use `htons()`?
-
-The `htons()` function is used to convert the port number from the host byte order (little-endian) to the network byte order (big-endian). This conversion is necessary because networks use big-endian format for data transmission.
-
-### Listening on All IP Addresses
-
-If you want the server to accept connections from any available IP address, you can set `sin_addr.s_addr` to `INADDR_ANY`:
-
-```cpp
-serv_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all connected IP addresses
-```
-
-This allows the server to accept connections from any IP address.
-
----
-
-## Key Functions and Concepts
-
-### `setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))`
-- **SO_REUSEADDR**: This option allows the socket to reuse a port that is already in use, which is useful when the server is restarted or if there is an error that causes the socket to close unexpectedly.
-- **sockfd**: The socket descriptor obtained after calling `socket()`.
-- **SOL_SOCKET**: Specifies that the option is set at the socket level.
-- **SO_REUSEADDR**: The option to allow port reuse.
-- **&opt**: A pointer to the option value (1 in this case, meaning the option is enabled).
-- **sizeof(opt)**: Specifies the size of the `opt` variable.
-
-### `bind(server_fd, (struct sockaddr *)&address, sizeof(address))`
-- The `bind()` function binds a socket to a specific IP address and port.
-- `server_fd`: The socket file descriptor.
-- `address`: A structure holding the server's IP and port.
-- `addrlen`: The length of the address structure.
-- Example address setup:
-  ```cpp
-  address.sin_family = AF_INET;
-  address.sin_addr.s_addr = INADDR_ANY;
-  address.sin_port = htons(PORT);
-  ```
-
-### `listen(server_fd, 3)`
-- The `listen()` function prepares the server socket to accept incoming connections. 
-- The second argument (`3`) specifies the maximum number of connections that can be queued before the server starts accepting them.
-
-### `accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)`
-- The `accept()` function accepts an incoming connection from a client.
-- Returns a new socket file descriptor (`new_socket`) that is used for communication with the client.
-- `address`: The client's IP and port information.
-- `addrlen`: The length of the address structure, which is updated upon return.
-
-### Client-Server Communication Loop
-```cpp
-while (true) {
-    memset(buffer, 0, BUFFER_SIZE);
-    int bytes_read = read(new_socket, buffer, BUFFER_SIZE);
-    if (bytes_read <= 0) break;
-    std::cout << "Message from client: " << buffer;
-    send(new_socket, buffer, strlen(buffer), 0);
+// Bağlı istemcileri ekle
+for (int client_fd : connected_clients) {
+    FD_SET(client_fd, &read_fds);
 }
-```
-- **read(new_socket, buffer, BUFFER_SIZE)**: Reads data sent by the client into the `buffer`. If no data is received or the client disconnects, the loop ends.
-- **send(new_socket, buffer, strlen(buffer), 0)**: Echoes the received message back to the client.
 
-### `fd_set` and `select()`
-- **fd_set**: A data structure used to store a collection of file descriptors (sockets) that can be monitored for readiness (e.g., readability, writability, or errors).
-- **FD_ZERO()**: Clears all file descriptors in the `fd_set`.
-- **FD_SET()**: Adds a file descriptor to the `fd_set`.
-- **FD_CLR()**: Removes a file descriptor from the `fd_set`.
-- **FD_ISSET()**: Checks if a file descriptor is ready for reading, writing, or has an error.
+// select() ile soketleri izle
+fd_set temp_fds = read_fds;        // Orijinal kümeyi koru
+select(max_fd + 1, &temp_fds, NULL, NULL, NULL);
 
-#### Example of using `select()`:
-```cpp
-fd_set readfds;
-FD_ZERO(&readfds);
-FD_SET(sockfd, &readfds);
+// Hazır olan soketleri kontrol et
+if (FD_ISSET(server_fd, &temp_fds)) {
+    // Yeni bağlantı isteği var
+    accept_new_connection();
+}
 
-struct timeval timeout;
-timeout.tv_sec = 5;
-timeout.tv_usec = 0;
-
-int activity = select(MAX_FDS, &readfds, NULL, NULL, &timeout);
-if (activity == -1) {
-    std::cerr << "select() error" << std::endl;
-} else if (activity == 0) {
-    std::cout << "Timeout occurred, no data to read" << std::endl;
-} else {
-    if (FD_ISSET(sockfd, &readfds)) {
-        std::cout << "Data is available to read on sockfd" << std::endl;
+// İstemci soketlerini kontrol et
+for (int client_fd : connected_clients) {
+    if (FD_ISSET(client_fd, &temp_fds)) {
+        // İstemciden veri gelmiş
+        handle_client_data(client_fd);
     }
 }
 ```
 
-### Accepting New Connections
-```cpp
-if (FD_ISSET(sockfd, &tmpfds)) {
-    new_socket = accept(sockfd, NULL, NULL);
-    if (new_socket < 0)
-        perr("accept error failed", sockfd);
-    else {
-        std::cout << "Connection accepted" << std::endl;
-        FD_SET(new_socket, &readfds);
-        if (new_socket > max_sd)
-            max_sd = new_socket;
-        connected_clients.push_back(new_socket);
-    }
-}
-```
-- **FD_SET(new_socket, &readfds)**: Adds the new socket to the set for monitoring.
-- **max_sd**: Keeps track of the highest file descriptor, which is used by `select()` to monitor multiple file descriptors.
-- **connected_clients.push_back(new_socket)**: Adds the new client socket to the list of connected clients.
+## IRC Komutları
 
-### Receiving Data with `recv()`
-```cpp
-int valread = recv(connected_clients[i], buffer, sizeof(buffer), 0);
-```
-- **recv()**: Receives data from a socket.
-- Returns the number of bytes read, `0` if the client closes the connection, or a negative value if there is an error.
-  - **sockfd**: The socket file descriptor.
-  - **buf**: The buffer to store the received data.
-  - **len**: The maximum number of bytes to read.
-  - **flags**: Usually set to `0` for normal data reception.
+### Temel Komutlar
+
+| Komut | Sözdizimi | Parametreler | Açıklama | Gereksinimler |
+|-------|-----------|--------------|-----------|----------------|
+| USER | `USER <nick> <mode> <unused> :<username>` | • nick: Takma ad<br>• mode, unused: Kullanılmıyor<br>• username: Kullanıcı adı | İlk bağlantı için kullanıcı kaydı | • İlk bağlantıda zorunlu<br>• Benzersiz nickname |
+| PASS | `PASS <password>` | • password: Sunucu şifresi | Sunucu şifresi ile giriş | • İlk bağlantıda zorunlu |
+| NICK | `NICK <nickname>` | • nickname: Yeni takma ad | Kullanıcı takma adını değiştirir | • Benzersiz olmalı |
+
+### Kanal Komutları
+
+| Komut | Sözdizimi | Parametreler | Açıklama | Gereksinimler |
+|-------|-----------|--------------|-----------|----------------|
+| JOIN | `JOIN <#channel>` | • #channel: Kanal adı | Kanala katılım | • Login olmuş olmak |
+| PRIVMSG | `PRIVMSG <hedef> [:mesaj]` | • hedef: Kanal/kullanıcı<br>• mesaj: İletilecek mesaj | Mesaj gönderimi | • Kanala üye olmak<br>• : ile boşluklu mesaj |
+| TOPIC | `TOPIC <#channel> <topic>` | • #channel: Kanal<br>• topic: Yeni konu | Kanal konusunu değiştirir | • Operator olmak |
+| KICK | `KICK <#channel> <nick> [:reason]` | • #channel: Kanal<br>• nick: Hedef kullanıcı<br>• reason: Sebep | Kullanıcıyı kanaldan atar | • Operator olmak |
+
+### Yönetim Komutları
+
+| Komut | Sözdizimi | Parametreler | Açıklama | Özellikler |
+|-------|-----------|--------------|-----------|------------|
+| MODE | `MODE <#channel> <+/-><flags> [param]` | • flags: o/k/i/t/l<br>• param: Gerekli parametre | Kanal ayarlarını değiştirir | **Mod Tipleri**:<br>• o: Operator<br>• k: Şifre<br>• i: Invite-only<br>• t: Topic koruması<br>• l: Kullanıcı limiti |
+| INVITE | `INVITE <nick> <#channel>` | • nick: Kullanıcı<br>• #channel: Kanal | Kullanıcıyı kanala davet eder | • Operator olmak gerekli |
+| HELP | `HELP [komut]` | • komut: Komut adı | Komut yardımı gösterir | • Herkes kullanabilir |
+
+### Hata Kodları
+
+| Kod | Hata | Açıklama |
+|-----|------|-----------|
+| 401 | ERR_NOSUCHNICK | Belirtilen nickname bulunamadı |
+| 403 | ERR_NOSUCHCHANNEL | Belirtilen kanal bulunamadı |
+| 431 | ERR_NONICKNAMEGIVEN | Nickname belirtilmedi |
+| 432 | ERR_ERRONEUSNICKNAME | Geçersiz nickname |
+| 433 | ERR_NICKNAMEINUSE | Nickname kullanımda |
+| 461 | ERR_NEEDMOREPARAMS | Eksik parametre |
+| 464 | ERR_PASSWDMISMATCH | Yanlış şifre |
+| 482 | ERR_CHANOPRIVSNEEDED | Operator yetkisi gerekli |
+
+
+## Güvenlik Önlemleri
+
+1. Şifre doğrulama
+2. Kanal operatör yetkileri
+3. Bağlantı sınırlamaları
+4. Buffer overflow koruması
+
+## Performans Optimizasyonları
+
+1. Select() ile etkin I/O multiplexing
+2. Verimli bellek yönetimi
+3. Komut işleme optimizasyonları
+4. Bağlantı havuzu yönetimi
 

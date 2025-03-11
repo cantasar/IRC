@@ -14,7 +14,11 @@ Channel &Channel::operator=(Channel const &channel){
     return *this;
 }
 
-Channel::~Channel(){}
+Channel::~Channel(){
+    _clients.clear();
+    _operators.clear();
+    _invitedClients.clear();
+}
 
 void Channel::setName(std::string name){
     _name = name;
@@ -131,15 +135,6 @@ int Channel::getLimit() const{
 
 void Channel::addInvited(Client client) {
     _invitedClients.push_back(client);
-}
-
-void Channel::removeInvited(Client client) {
-    for (std::vector<Client>::iterator it = _invitedClients.begin(); it != _invitedClients.end(); ++it) {
-        if (it->getNickname() == client.getNickname()) {
-            _invitedClients.erase(it);
-            break;
-        }
-    }
 }
 
 bool Channel::isInvited(Client client) const {

@@ -2,8 +2,10 @@
 #include "../Channel.hpp"
 #include "../Client.hpp"
 
-void Server::invite(size_t client_index)
+void Server::invite(size_t client_index, const std::string& command)
 {
+    std::vector<std::string> input = parseCommand(command);
+
     // Check if client is connected
     if (!clients[client_index].getConnected())
     {
