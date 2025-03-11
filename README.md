@@ -51,7 +51,177 @@ Sunucuyu başlatmak için:
 
 ### Soket Programlama
 
-Bu bölümde, projede kullanılan temel soket programlama fonksiyonları ve yapıları detaylı olarak açıklanmaktadır.
+IRC sunucumuz, POSIX soket programlama API'lerini kullanarak çok istemcili bir ağ uygulaması olarak çalışır. Programın çalışma mantığı şu şekildedir:
+
+1. **Başlangıç Aşaması**
+   - Sunucu başlatıldığında, öncelikle bir TCP soketi oluşturulur.
+   - Bu soket, belirtilen port üzerinden gelen bağlantıları dinlemek üzere yapılandırılır.
+   - Soket, tekrar kullanılabilir (reusable) olarak ayarlanır ki sunucu yeniden başlatıldığında "address already in use" hatası alınmasın.
+
+2. **Dinleme Aşaması**
+   - Soket, belirtilen porta bağlanır (bind edilir).
+   - Pasif dinleme moduna geçilir ve bağlantı istekleri kabul edilmeye başlanır.
+   - Bu aşamada sunucu, yeni bağlantıları kabul etmeye hazırdır.
+
+3. **Çoklu İstemci Yönetimi**
+   - Sunucu, tek bir thread üzerinde birden fazla istemciyi yönetebilmek için `select()` mekanizmasını kullanır.
+   - Her bir soket için okuma, yazma ve hata durumları eşzamanlı olarak izlenir.
+   - Bu sayede sunucu, bloklama olmadan tüm istemcilere hizmet verebilir.
+
+4. **Bağlantı Yönetimi**
+   - Yeni bir istemci bağlandığında:
+     * Bağlantı kabul edilir ve yeni bir soket oluşturulur
+     * İstemcinin IP adresi alınır ve kaydedilir
+     * İstemci bilgileri veri yapılarına eklenir
+   - Mevcut istemcilerden veri geldiğinde:
+     * Veri okunur ve işlenir
+     * IRC protokolüne göre komutlar yorumlanır
+     * Gerekli yanıtlar oluşturulur ve gönderilir
+   - Bir istemci bağlantıyı kestiğinde:
+     * Soket kapatılır
+     * İstemci bilgileri temizlenir
+     * İlgili kanallardan çıkarılır
+
+5. **Veri İşleme**
+   - İstemcilerden gelen veriler tamponlarda (buffer) toplanır
+   - Tampondaki veriler tam komutlar halinde işlenir
+   - Her komut için uygun işleyici (handler) çağrılır
+   - Yanıtlar oluşturulur ve ilgili istemcilere iletilir
+
+6. **Hata Yönetimi**
+   - Bağlantı kopmaları tespit edilir ve temizlenir
+   - Soket hataları kontrol edilir ve yönetilir
+   - Buffer taşmaları engellenir
+   - Geçersiz komutlar reddedilir
+
+Bu yapı sayesinde sunucu:
+- Çok sayıda istemciye eşzamanlı hizmet verebilir
+- Kaynakları verimli kullanır
+- Güvenilir ve kararlı çalışır
+- Ölçeklenebilir bir yapı sunar
+
+#### Soket Programlama Akışı
+
+1. **Soket Oluşturma ve Yapılandırma**
+```cpp
+// Soket oluşturma
+sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+// Soket yapılandırması
+struct sockaddr_in server_addr;
+server_addr.sin_family = AF_INET;           // IPv4 protokolü
+server_addr.sin_port = htons(port);         // Port numarası (network byte order)
+server_addr.sin_addr.s_addr = INADDR_ANY;   // Tüm interface'leri dinle
+
+// SO_REUSEADDR ve SO_REUSEPORT seçeneklerini etkinleştirme
+int opt = 1;
+setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+```
+
+2. **Soketin Bağlanması ve Dinleme**
+```cpp
+// Soketi belirtilen adres ve porta bağlama
+bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+
+// Soketi pasif dinleme moduna alma (max 3 bekleyen bağlantı)
+listen(sockfd, 3);
+```
+
+3. **I/O Multiplexing ile Bağlantı Yönetimi**
+```cpp
+// fd_set yapısını hazırlama
+fd_set read_fds;
+FD_ZERO(&read_fds);                // Kümeyi temizle
+FD_SET(sockfd, &read_fds);        // Ana soketi dinleme kümesine ekle
+
+while (true) {
+    fd_set active_fds = read_fds;  // Orijinal kümeyi koru
+    
+    // Soketleri izle (blocking)
+    select(max_fd + 1, &active_fds, NULL, NULL, NULL);
+    
+    // Yeni bağlantı kontrolü
+    if (FD_ISSET(sockfd, &active_fds)) {
+        handleNewConnection();
+    }
+    
+    // Mevcut bağlantıları kontrol et
+    for (client_index = 0; client_index < connected_clients.size(); client_index++) {
+        if (FD_ISSET(connected_clients[client_index], &active_fds)) {
+            handleClientData(client_index, active_fds);
+        }
+    }
+}
+```
+
+4. **Yeni Bağlantı Kabulü**
+```cpp
+void handleNewConnection() {
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    
+    // Yeni bağlantıyı kabul et
+    int client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len);
+    
+    // IP adresini string formatına dönüştür
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+    
+    // Yeni soketi izleme kümesine ekle
+    FD_SET(client_sockfd, &read_fds);
+    connected_clients.push_back(client_sockfd);
+    
+    // Client nesnesini oluştur ve yapılandır
+    Client new_client(client_sockfd);
+    new_client.setIp_address(ip_str);
+    clients.push_back(new_client);
+}
+```
+
+5. **Veri Alışverişi**
+```cpp
+void handleClientData(size_t client_index, fd_set& active_fds) {
+    std::vector<char> buffer(1024, 0);
+    
+    // Veri al
+    int bytes_received = recv(connected_clients[client_index], &buffer[0], buffer.size(), 0);
+    
+    if (bytes_received <= 0) {
+        disconnectClient(client_index);
+        return;
+    }
+    
+    // Alınan veriyi işle
+    std::string received_data(&buffer[0], bytes_received);
+    clients[client_index].appendToCommandBuffer(received_data);
+    processClientBuffer(client_index);
+}
+
+// Veri gönderme (Client sınıfı içinde)
+void Client::message(const std::string &message) const {
+    send(c_sockfd, message.c_str(), message.size(), 0);
+}
+```
+
+6. **Bağlantı Sonlandırma**
+```cpp
+void disconnectClient(size_t client_index) {
+    int client_fd = connected_clients[client_index];
+    
+    // Soketi kapat
+    close(client_fd);
+    
+    // İzleme kümesinden çıkar
+    FD_CLR(client_fd, &read_fds);
+    
+    // Client verilerini temizle
+    connected_clients.erase(connected_clients.begin() + client_index);
+    clients.erase(clients.begin() + client_index);
+}
+```
+
+Bu akış, POSIX soket API'lerini kullanarak çok istemcili bir IRC sunucusu implementasyonunu gerçekleştirir. `select()` fonksiyonu ile I/O multiplexing sağlanarak, tek bir thread üzerinde birden fazla bağlantı eşzamanlı olarak yönetilir.
 
 #### 1. socket()
 
@@ -158,7 +328,78 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
   - `exceptfds`: İstisnai durumlar için izlenecek soketler
   - `timeout`: Zaman aşımı değeri
 
-#### 8. fd_set ve İlgili Makrolar
+
+### IP İlişkili Fonksiyonlar
+
+#### 1. inet_ntop()
+
+```cpp
+const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
+```
+
+- **Açıklama**: IP adresini okunabilir string formatına dönüştürür
+- **Parametreler**:
+  - `af`: Adres ailesi (AF_INET: IPv4)
+  - `src`: Kaynak IP adresi
+  - `dst`: Hedef string buffer
+  - `size`: Buffer boyutu
+- **Dönüş**: Başarılı olursa dst pointer'ı, hata durumunda NULL
+- **Kullanım Örneği**:
+```cpp
+char ip_str[INET_ADDRSTRLEN];
+inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN);
+```
+
+#### 2. inet_pton()
+
+```cpp
+int inet_pton(int af, const char *src, void *dst);
+```
+
+- **Açıklama**: String formatındaki IP adresini binary formata dönüştürür
+- **Parametreler**:
+  - `af`: Adres ailesi (AF_INET: IPv4)
+  - `src`: Kaynak IP string'i
+  - `dst`: Hedef binary buffer
+- **Dönüş**: Başarılı olursa 1, hatalı format 0, hata durumunda -1
+- **Kullanım Örneği**:
+```cpp
+struct sockaddr_in addr;
+inet_pton(AF_INET, "192.168.1.1", &(addr.sin_addr));
+```
+
+#### 3. htons() / ntohs()
+
+```cpp
+uint16_t htons(uint16_t hostshort);  // Host to Network Short
+uint16_t ntohs(uint16_t netshort);   // Network to Host Short
+```
+
+- **Açıklama**: Port numaralarını host ve network byte order arasında dönüştürür
+- **Parametreler**:
+  - `hostshort`: Host byte order'daki değer
+  - `netshort`: Network byte order'daki değer
+- **Kullanım Örneği**:
+```cpp
+server_addr.sin_port = htons(port);        // Port numarasını network byte order'a çevirir
+int client_port = ntohs(addr.sin_port);    // Network byte order'dan host byte order'a çevirir
+```
+
+#### 4. INADDR_ANY
+
+```cpp
+server_addr.sin_addr.s_addr = INADDR_ANY;
+```
+
+- **Açıklama**: Sunucunun tüm network interface'lerinden gelen bağlantıları dinlemesini sağlar
+- **Özellikler**:
+  - Tüm yerel IP adreslerini dinler
+  - 0.0.0.0 IP adresine karşılık gelir
+  - Sunucu uygulamalarında yaygın olarak kullanılır
+
+
+
+### fd_set ve İlgili Makrolar
 
 ```cpp
 typedef struct {
